@@ -1,28 +1,26 @@
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:9358444059ed78e2975ada2c189f1c1a3144a5dab6f35bff8c981afb38946634
 
 WORKDIR /app
 
-# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ curl && rm -rf /var/lib/apt/lists/*
+    gcc g++ curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Python deps
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Layer 1: heavy deps (torch, transformers) — cached unless requirements-heavy.txt changes
+COPY requirements-heavy.txt .
+RUN pip install --no-cache-dir -r requirements-heavy.txt
 
-# App code
+# Layer 2: medium deps
+COPY requirements-medium.txt .
+RUN pip install --no-cache-dir -r requirements-medium.txt
+
+# Layer 3: light deps (change most often)
+COPY requirements-light.txt .
+RUN pip install --no-cache-dir -r requirements-light.txt \
+    && pip cache purge
+
 COPY . .
 
-# Create non-root user
 RUN useradd -m quantswarm && chown -R quantswarm:quantswarm /app
 USER quantswarm
-
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Default: run dashboard API
-# Override with: docker run quantswarm python scripts/run_paper.py
-CMD ["uvicorn", "dashboard.api:app", "--host", "0.0.0.0", "--port", "8000"]
