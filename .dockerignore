@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.git
+.env
+*.log
+.venv
+venv
+.DS_Store
+tests/
+*.md
+notebooks/

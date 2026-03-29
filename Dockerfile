@@ -7,18 +7,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Layer 1: heavy deps (torch, transformers) — cached unless requirements-heavy.txt changes
-COPY requirements-heavy.txt .
-RUN pip install --no-cache-dir -r requirements-heavy.txt
-
-# Layer 2: medium deps
-COPY requirements-medium.txt .
-RUN pip install --no-cache-dir -r requirements-medium.txt
-
-# Layer 3: light deps (change most often)
-COPY requirements-light.txt .
-RUN pip install --no-cache-dir -r requirements-light.txt \
-    && pip cache purge
+# heavy first so Railway caches this layer
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip cache purge \
+    && find /usr/local/lib/python3.11 -name "*.pyc" -delete \
+    && find /usr/local/lib/python3.11 -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 COPY . .
 
