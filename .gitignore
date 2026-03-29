@@ -1,0 +1,40 @@
+.env
+*.db
+*.log
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+/tmp/sec_downloads/
+backtest_result.json
+*.pkl
+*.pt
+*.pth
+node_modules/
+.DS_Store
+
+# Internal docs — never commit
+docs/monetization.md
+docs/pricing*.md
+
+# Models
+models/
+*.pkl
+*.pt
+*.pth
+
+# Logs
+*.log
+quantswarm.log
+
+# Env
+.env
+

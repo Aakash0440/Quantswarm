@@ -1,0 +1,94 @@
+name: QuantSwarm CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly model retrain check — every Sunday at 2am UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  test:
+    name: Test Suite (400 tests)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov hypothesis
+
+      - name: Run unit tests
+        run: |
+          pytest tests/test_suite.py -v --tb=short \
+            --cov=. --cov-report=xml --cov-report=term-missing \
+            -x  # stop on first failure
+        env:
+          TRADING_MODE: paper
+          DATABASE_URL: sqlite:///./test_quantswarm.db
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+        if: matrix.python-version == '3.11'
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check . --ignore E501,F401
+
+  backtest:
+    name: Backtest Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run walk-forward backtest
+        run: python scripts/run_backtest.py --start 2020-01-01 --end 2023-12-31
+        env:
+          TRADING_MODE: paper
+      - name: Validate Sharpe > 0.8
+        run: |
+          python -c "
+          import json
+          with open('backtest_result.json') as f:
+              r = json.load(f)
+          assert r['sharpe_ratio'] > 0.8, f'Sharpe {r[\"sharpe_ratio\"]} below 0.8 threshold'
+          print(f'Sharpe: {r[\"sharpe_ratio\"]:.2f} ✓')
+          print(f'Max DD: {r[\"max_drawdown\"]:.2%} ✓')
+          "
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t quantswarm:latest .

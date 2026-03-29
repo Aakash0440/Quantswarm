@@ -1,0 +1,82 @@
+{
+  "summary": {
+    "total": 203,
+    "passed": 203,
+    "failed": 0,
+    "pass_rate": 1.0
+  },
+  "scale_metrics": {
+    "100": {
+      "passed": 29,
+      "total": 29,
+      "pass_rate": 1.0,
+      "avg_ms": 140.63532759058128
+    },
+    "500": {
+      "passed": 29,
+      "total": 29,
+      "pass_rate": 1.0,
+      "avg_ms": 124.53317930841625
+    },
+    "1000": {
+      "passed": 29,
+      "total": 29,
+      "pass_rate": 1.0,
+      "avg_ms": 125.1232724110917
+    },
+    "5000": {
+      "passed": 29,
+      "total": 29,
+      "pass_rate": 1.0,
+      "avg_ms": 126.39612413878585
+    },
+    "10000": {
+      "passed": 29,
+      "total": 29,
+      "pass_rate": 1.0,
+      "avg_ms": 130.75552414500572
+    },
+    "50000": {
+      "passed": 29,
+      "total": 29,
+      "pass_rate": 1.0,
+      "avg_ms": 158.93363793067442
+    },
+    "100000": {
+      "passed": 29,
+      "total": 29,
+      "pass_rate": 1.0,
+      "avg_ms": 172.6400310290046
+    }
+  },
+  "reference_portfolio": {
+    "total_return": 0.04495039685269774,
+    "sharpe": 1.9956156228972262,
+    "sortino": 4.2181312318850495,
+    "calmar": 1.9334687541437765,
+    "max_drawdown": 0.023248575816336357,
+    "win_rate": 0.4722222222222222,
+    "total_trades": 252,
+    "final_equity": 104495.03968526977,
+    "halted": false,
+    "halt_day": null,
+    "total_slippage_cost": 1134.1364045633338
+  },
+  "failed_tests": [],
+  "timestamp": "2026-03-25T07:15:02.373695",
+  "model_info": {
+    "temporal_model": "LSTM+Attention (torch) / Ridge fallback",
+    "conformal_predictor": {
+      "method": "split_conformal",
+      "alpha": 0.1,
+      "coverage_guarantee": "90%",
+      "reference": "Angelopoulos & Bates 2022"
+    },
+    "ensemble": [
+      "TemporalLSTM",
+      "XGBoost",
+      "BayesianAggregator"
+    ],
+    "drift_detection": "FRAMEWORM-SHIFT (KS + MMD + Chi2)"
+  }
+}

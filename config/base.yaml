@@ -1,0 +1,129 @@
+# QuantSwarm v4 — Fast Local Paper Trading Config
+# 20 instruments: 10 stocks + 10 crypto
+# Each cycle completes in ~60-90s instead of 14 minutes
+
+ingestion:
+  refresh_interval_sec: 30
+  sources:
+    reddit: true
+    twitter_nitter: false
+    sec_edgar: false
+    news_rss: true
+    on_chain: false
+    market_data: true
+  reddit_subreddits:
+    - wallstreetbets
+    - investing
+    - stocks
+    - CryptoCurrency
+  sec_forms: [4, 8-K]
+
+instruments:
+  stocks:
+    - AAPL
+    - MSFT
+    - NVDA
+    - GOOGL
+    - META
+    - AMZN
+    - TSLA
+    - AMD
+    - NFLX
+    - JPM
+  crypto:
+    - XRP-USD
+    - DOGE-USD
+    - ADA-USD
+    - AVAX-USD
+    - DOT-USD
+    - LINK-USD
+
+nlp:
+  finbert_model: ProsusAI/finbert
+  batch_size: 32
+  min_confidence: 0.55
+  bot_filter:
+    min_account_age_days: 30
+    max_tweets_per_day: 100
+    min_follower_ratio: 0.05
+    cosine_similarity_threshold: 0.88
+    consensus_required: 3
+
+drift:
+  tests: [ks, mmd, chi2]
+  window_size: 500
+  sensitivity: medium
+  tier1_pvalue: 0.05
+  tier2_pvalue: 0.01
+  tier3_pvalue: 0.001
+  retrain_on_drift: true
+
+prediction:
+  model: ensemble
+  models: [lstm_attention, xgboost, bayesian]
+  ensemble_weights: [0.5, 0.3, 0.2]
+  horizons: [1h, 4h, 1d, 3d]
+  min_confidence: 0.55
+  quantile_outputs: [0.1, 0.5, 0.9]
+  walk_forward_windows: 12
+  holdout_fraction: 0.15
+  temporal_model:
+    hidden: 64
+    layers: 2
+    seq_len: 10
+    epochs: 30
+
+mirofish:
+  n_agents: 150
+  run_interval_hours: 1
+  consensus_threshold: 0.55
+  panic_threshold: 0.30
+  personality_types: [bull, bear, neutral, momentum, contrarian, fundamentals]
+
+risk:
+  max_position_pct: 0.10
+  kelly_fraction: 0.25
+  max_drawdown_pct: 0.15
+  stop_loss_pct: 0.05
+  max_corr_pair: 0.70
+  max_leverage: 1.5
+  loss_streak_limit: 3
+  blackout_pre_earnings_min: 30
+  blackout_post_earnings_min: 30
+  no_trade_open_close_min: 15
+  overnight_size_reduction: 0.5
+
+execution:
+  mode: paper
+  slippage_model: linear
+  base_slippage_bps: 5
+  market_impact_coefficient: 0.1
+  max_order_pct_adv: 0.05
+  iceberg_threshold_usd: 10000
+  retry_attempts: 3
+  retry_delay_sec: 2
+
+explainability:
+  enabled: true
+  shap_background_samples: 50
+  top_features: 5
+
+alerts:
+  black_swan_vix_threshold: 40
+  sigma_threshold: 3.0
+  telegram: false
+  slack: false
+  email: false
+
+backtester:
+  start_date: "2019-01-01"
+  end_date: "2024-12-31"
+  initial_capital: 100000
+  commission_bps: 5
+  slippage_bps: 5
+  benchmark: SPY
+
+dashboard:
+  host: 0.0.0.0
+  port: 8000
+  refresh_interval_sec: 5

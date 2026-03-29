@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuantSwarm v3 — Live Dashboard</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f14; --bg2: #151820; --bg3: #1c2030;
+      --accent: #f5a623; --green: #00e676; --red: #ff4444;
+      --blue: #4fc3f7; --purple: #ce93d8; --text: #e0e0e0; --muted: #666;
+      --border: #2a2d3a; --radius: 8px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+    #root { display: flex; flex-direction: column; min-height: 100vh; }
+    .header { background: var(--bg2); border-bottom: 1px solid var(--border);
+      padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+    .dot-yellow { background: var(--accent); }
+    .dot-red { background: var(--red); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px 24px; }
+    .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; padding: 0 24px 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding: 0 24px 16px; }
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .card-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .card-value { font-size: 24px; font-weight: 700; }
+    .card-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .green { color: var(--green); } .red { color: var(--red); }
+    .blue { color: var(--blue); } .accent { color: var(--accent); } .purple { color: var(--purple); }
+    .table { width: 100%; border-collapse: collapse; }
+    .table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+    .table td { padding: 7px 8px; border-bottom: 1px solid #1a1d27; font-size: 12px; }
+    .table tr:hover td { background: var(--bg3); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .badge-long { background: rgba(0,230,118,0.15); color: var(--green); }
+    .badge-short { background: rgba(255,68,68,0.15); color: var(--red); }
+    .badge-bull { background: rgba(0,230,118,0.1); color: var(--green); }
+    .badge-bear { background: rgba(255,68,68,0.1); color: var(--red); }
+    .badge-sideways { background: rgba(245,166,35,0.1); color: var(--accent); }
+    .badge-crisis { background: rgba(255,68,68,0.2); color: var(--red); border: 1px solid var(--red); }
+    .badge-recovery { background: rgba(79,195,247,0.1); color: var(--blue); }
+    .signal-bar { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1a1d27; }
+    .signal-bar:last-child { border-bottom: none; }
+    .progress { flex: 1; background: var(--bg3); border-radius: 3px; height: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+    .swarm-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+    .swarm-cell { height: 6px; border-radius: 1px; }
+    .tab-bar { display: flex; gap: 4px; padding: 0 24px 12px; }
+    .tab { padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+      background: var(--bg2); border: 1px solid var(--border); color: var(--muted); }
+    .tab.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+    .log-line { font-size: 11px; padding: 3px 0; border-bottom: 1px solid #111; color: var(--muted); }
+    .log-line span { margin-right: 8px; }
+    .log-info { color: var(--blue); } .log-warn { color: var(--accent); }
+    .log-success { color: var(--green); } .log-error { color: var(--red); }
+    canvas { max-height: 200px; }
+    .halted-banner { background: rgba(255,68,68,0.1); border: 1px solid var(--red);
+      border-radius: var(--radius); padding: 10px 16px; margin: 0 24px 12px;
+      color: var(--red); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .refresh-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+      padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+    ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const API = window.location.origin;
+const WS_URL = `ws://${window.location.host}/ws`;
+
+const fmt = {
+  pct: v => v == null ? '—' : `${(v*100).toFixed(2)}%`,
+  pctSign: v => v == null ? '—' : `${v>=0?'+':''}${(v*100).toFixed(2)}%`,
+  money: v => v == null ? '—' : `$${v.toLocaleString('en-US', {maximumFractionDigits:0})}`,
+  price: v => v == null ? '—' : v >= 100 ? `$${v.toFixed(2)}` : `$${v.toFixed(4)}`,
+  num: v => v == null ? '—' : v.toFixed(3),
+  ts: ts => new Date(ts).toLocaleTimeString(),
+};
+
+function useWebSocket(url, onMessage) {
+  const ws = useRef(null);
+  useEffect(() => {
+    const connect = () => {
+      try {
+        ws.current = new WebSocket(url);
+        ws.current.onmessage = e => { try { onMessage(JSON.parse(e.data)); } catch {} };
+        ws.current.onclose = () => setTimeout(connect, 3000);
+        ws.current.onerror = () => ws.current.close();
+      } catch {}
+    };
+    connect();
+    const ping = setInterval(() => {
+      if (ws.current?.readyState === WebSocket.OPEN) ws.current.send('ping');
+    }, 20000);
+    return () => { clearInterval(ping); ws.current?.close(); };
+  }, []);
+}
+
+function StatCard({ title, value, sub, color, prefix }) {
+  return (
+    <div className="card">
+      <div className="card-title">{title}</div>
+      <div className={`card-value ${color||''}`}>{prefix}{value}</div>
+      {sub && <div className="card-sub">{sub}</div>}
+    </div>
+  );
+}
+
+function RegimeBadge({ regime }) {
+  const cls = {
+    Bull:'bull', Bear:'bear', Sideways:'sideways',
+    Crisis:'crisis', Recovery:'recovery'
+  }[regime] || 'sideways';
+  return <span className={`badge badge-${cls}`}>{regime || '—'}</span>;
+}
+
+function PnlChart({ history }) {
+  const ref = useRef(null);
+  const chart = useRef(null);
+  useEffect(() => {
+    if (!ref.current || !history?.length) return;
+    const labels = history.map(p => fmt.ts(p.ts));
+    const data = history.map(p => (p.pnl * 100).toFixed(2));
+    if (chart.current) { chart.current.destroy(); }
+    chart.current = new Chart(ref.current, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data, borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.08)',
+          tension: 0.3, pointRadius: 0, fill: true, borderWidth: 1.5,
+        }]
+      },
+      options: {
+        animation: false, responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { mode:'index', intersect:false } },
+        scales: {
+          x: { display: false },
+          y: { grid: { color:'#1a1d27' }, ticks: { color:'#666', callback: v => v+'%' } }
+        }
+      }
+    });
+    return () => chart.current?.destroy();
+  }, [history]);
+  return <canvas ref={ref} style={{height:'180px'}} />;
+}
+
+function SwarmViz({ personalities }) {
+  if (!personalities) return <div style={{color:'var(--muted)'}}>Waiting for swarm data…</div>;
+  const colors = {
+    bull:'#00e676', bear:'#ff4444', neutral:'#666', momentum:'#4fc3f7',
+    contrarian:'#ce93d8', fundamentals:'#f5a623', panic:'#ff8800'
+  };
+  return (
+    <div>
+      {Object.entries(personalities).map(([type, pct]) => (
+        <div key={type} className="signal-bar">
+          <span style={{width:90,color:'var(--muted)',fontSize:11}}>{type}</span>
+          <div className="progress">
+            <div className="progress-fill" style={{width:`${pct*100}%`, background:colors[type]||'#666'}} />
+          </div>
+          <span style={{width:36,textAlign:'right',color:colors[type]||'#666'}}>{fmt.pct(pct)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SignalRow({ sig }) {
+  return (
+    <tr>
+      <td className="accent" style={{fontWeight:700}}>{sig.ticker}</td>
+      <td><span className={`badge badge-${sig.direction?.toLowerCase()}`}>{sig.direction}</span></td>
+      <td className={sig.confidence >= 0.7 ? 'green' : 'accent'}>{fmt.pct(sig.confidence)}</td>
+      <td className={sig.magnitude >= 0 ? 'green' : 'red'}>{fmt.pctSign(sig.magnitude)}</td>
+      <td style={{color:'var(--muted)'}}>{sig.horizon || '—'}</td>
+      <td style={{color:'var(--muted)',fontSize:10}}>{sig.regime || '—'}</td>
+    </tr>
+  );
+}
+
+function PositionRow({ pos }) {
+  const pnl = pos.unrealized_pnl || 0;
+  return (
+    <tr>
+      <td className="accent" style={{fontWeight:700}}>{pos.ticker}</td>
+      <td><span className={`badge badge-${pos.direction?.toLowerCase()}`}>{pos.direction}</span></td>
+      <td>{fmt.price(pos.entry_price)}</td>
+      <td>{fmt.price(pos.current_price)}</td>
+      <td className={pnl >= 0 ? 'green' : 'red'}>{fmt.pctSign(pnl)}</td>
+      <td style={{color:'var(--muted)',fontSize:10}}>{fmt.price(pos.stop_loss_price)}</td>
+    </tr>
+  );
+}
+
+function LogPanel({ logs }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  }, [logs]);
+  return (
+    <div ref={ref} style={{height:220,overflowY:'auto',padding:'0 4px'}}>
+      {(logs||[]).slice(-100).map((l,i) => (
+        <div key={i} className="log-line">
+          <span style={{color:'var(--muted)',marginRight:8,fontSize:10}}>
+            {fmt.ts(l.ts||Date.now())}
+          </span>
+          <span className={`log-${l.level||'info'}`}>{l.message}</span>
+        </div>
+      ))}
+      {(!logs||!logs.length) && <div style={{color:'var(--muted)',padding:8}}>No logs yet…</div>}
+    </div>
+  );
+}
+
+function App() {
+  const [state, setState] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [tab, setTab] = useState('overview');
+  const [connected, setConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  const fetchState = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/state`);
+      if (r.ok) {
+        const d = await r.json();
+        setState(d);
+        setLastUpdate(new Date().toLocaleTimeString());
+      }
+    } catch {}
+  }, []);
+
+  useWebSocket(WS_URL, msg => {
+    setConnected(true);
+    if (msg.type === 'state_update') {
+      setState(prev => ({ ...prev, ...msg.data }));
+      setLastUpdate(new Date().toLocaleTimeString());
+    }
+    if (msg.type === 'log') {
+      setLogs(prev => [...prev.slice(-499), msg]);
+    }
+    if (msg.type === 'init') {
+      setState(msg.state);
+    }
+  });
+
+  useEffect(() => {
+    fetchState();
+    const interval = setInterval(fetchState, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const portfolio = state?.portfolio || {};
+  const signals = state?.signals || [];
+  const positions = state?.positions || [];
+  const drift = state?.drift || {};
+  const swarm = state?.swarm || {};
+  const perf = state?.performance || {};
+  const halted = state?.halted || false;
+
+  const equity = portfolio.equity || 100000;
+  const startEquity = portfolio.start_equity || 100000;
+  const totalPnl = (equity - startEquity) / startEquity;
+
+  return (
+    <div id="root">
+      {/* Header */}
+      <div className="header">
+        <div style={{display:'flex',alignItems:'center',gap:16}}>
+          <div className="logo">QUANTSWARM v3</div>
+          <span style={{color:'var(--muted)',fontSize:11}}>100 instruments · MiroFish swarm</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:16}}>
+          {lastUpdate && <span style={{color:'var(--muted)',fontSize:11}}>Updated {lastUpdate}</span>}
+          <span>
+            <span className={`status-dot ${connected?'dot-green':'dot-red'}`}></span>
+            <span style={{fontSize:11,color:connected?'var(--green)':'var(--red)'}}>
+              {connected ? 'LIVE' : 'DISCONNECTED'}
+            </span>
+          </span>
+          <button className="refresh-btn" onClick={fetchState}>↻ Refresh</button>
+        </div>
+      </div>
+
+      {/* Halted banner */}
+      {halted && (
+        <div className="halted-banner">
+          ⚠️ TRADING HALTED — {state?.halt_reason || 'Circuit breaker triggered'}
+        </div>
+      )}
+
+      {/* KPI row */}
+      <div className="grid">
+        <StatCard title="Portfolio Value" value={fmt.money(equity)}
+          sub={`Started ${fmt.money(startEquity)}`}
+          color={totalPnl >= 0 ? 'green' : 'red'} />
+        <StatCard title="Total P&L" value={fmt.pctSign(totalPnl)}
+          sub={fmt.money(equity - startEquity)}
+          color={totalPnl >= 0 ? 'green' : 'red'} />
+        <StatCard title="Open Positions" value={positions.length}
+          sub={`Max: ${portfolio.max_positions||5}`} color="accent" />
+        <StatCard title="Sharpe (7d)" value={fmt.num(perf.sharpe_7d)}
+          sub={`Sortino: ${fmt.num(perf.sortino_7d)}`}
+          color={(perf.sharpe_7d||0)>=1?'green':'accent'} />
+      </div>
+
+      {/* Tabs */}
+      <div className="tab-bar">
+        {['overview','signals','positions','swarm','logs'].map(t => (
+          <button key={t} className={`tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
+            {t.charAt(0).toUpperCase()+t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* ── OVERVIEW tab ── */}
+      {tab === 'overview' && (
+        <>
+          <div className="grid-2">
+            {/* P&L chart */}
+            <div className="card">
+              <div className="card-title">Portfolio P&L History</div>
+              <PnlChart history={state?.pnl_history || []} />
+            </div>
+            {/* Regime + Drift */}
+            <div className="card">
+              <div className="card-title">Market Regime</div>
+              <div style={{marginBottom:12}}>
+                <RegimeBadge regime={drift.regime} />
+                <span style={{marginLeft:8,color:'var(--muted)',fontSize:11}}>{drift.description}</span>
+              </div>
+              <div className="card-title" style={{marginTop:12}}>Drift Scores</div>
+              {['ks','mmd','chi2'].map(k => (
+                <div key={k} className="signal-bar">
+                  <span style={{width:36,color:'var(--muted)',fontSize:11}}>{k.toUpperCase()}</span>
+                  <div className="progress">
+                    <div className="progress-fill" style={{
+                      width:`${Math.min((drift[k]||0)*1000,100)}%`,
+                      background: (drift[k]||0)>0.05?'var(--red)':'var(--green)'
+                    }} />
+                  </div>
+                  <span style={{width:50,textAlign:'right',fontSize:11,
+                    color:(drift[k]||0)>0.05?'var(--red)':'var(--green)'}}>
+                    {(drift[k]||0).toFixed(4)}
+                  </span>
+                </div>
+              ))}
+              <div style={{marginTop:12,display:'flex',gap:8,flexWrap:'wrap'}}>
+                <div><span style={{color:'var(--muted)',fontSize:10}}>Tier: </span>
+                  <span className={drift.tier==='LOCKDOWN'?'red':drift.tier==='PAUSE'?'accent':'green'}>
+                    {drift.tier||'CLEAR'}
+                  </span>
+                </div>
+                <div><span style={{color:'var(--muted)',fontSize:10}}>Retrain count: </span>
+                  <span className="blue">{drift.retrain_count||0}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid-3">
+            {/* Risk stats */}
+            <div className="card">
+              <div className="card-title">Risk Controls</div>
+              {[
+                ['Max Drawdown', fmt.pct(perf.max_drawdown), (perf.max_drawdown||0)>0.1?'red':'green'],
+                ['Daily Loss', fmt.pctSign(perf.daily_loss), (perf.daily_loss||0)<-0.03?'red':'green'],
+                ['Win Rate', fmt.pct(perf.win_rate), (perf.win_rate||0)>=0.5?'green':'accent'],
+                ['Avg Win/Loss', fmt.num(perf.avg_win_loss), (perf.avg_win_loss||0)>=1.5?'green':'accent'],
+                ['Loss Streak', perf.loss_streak||0, (perf.loss_streak||0)>=3?'red':'green'],
+              ].map(([label,val,col]) => (
+                <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #1a1d27'}}>
+                  <span style={{color:'var(--muted)',fontSize:11}}>{label}</span>
+                  <span className={col}>{val}</span>
+                </div>
+              ))}
+            </div>
+            {/* Execution stats */}
+            <div className="card">
+              <div className="card-title">Execution</div>
+              {[
+                ['Total Trades', perf.total_trades||0, 'accent'],
+                ['Wins', perf.wins||0, 'green'],
+                ['Losses', perf.losses||0, 'red'],
+                ['Avg Slippage', `${(perf.avg_slippage_bps||0).toFixed(1)} bps`, 'blue'],
+                ['Mode', portfolio.paper_mode?'PAPER':'LIVE', portfolio.paper_mode?'accent':'red'],
+              ].map(([label,val,col]) => (
+                <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #1a1d27'}}>
+                  <span style={{color:'var(--muted)',fontSize:11}}>{label}</span>
+                  <span className={col}>{val}</span>
+                </div>
+              ))}
+            </div>
+            {/* Latest signals preview */}
+            <div className="card">
+              <div className="card-title">Top Signals</div>
+              {signals.slice(0,5).map((s,i) => (
+                <div key={i} className="signal-bar">
+                  <span style={{width:60,fontWeight:700,color:'var(--accent)'}}>{s.ticker}</span>
+                  <span className={`badge badge-${s.direction?.toLowerCase()||'long'}`} style={{marginRight:6}}>
+                    {s.direction}
+                  </span>
+                  <span className={s.confidence>=0.7?'green':'accent'}>{fmt.pct(s.confidence)}</span>
+                </div>
+              ))}
+              {!signals.length && <div style={{color:'var(--muted)'}}>No signals yet</div>}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── SIGNALS tab ── */}
+      {tab === 'signals' && (
+        <div style={{padding:'0 24px 16px'}}>
+          <div className="card">
+            <div className="card-title" style={{marginBottom:10}}>
+              Active Trade Signals ({signals.length})
+            </div>
+            <table className="table">
+              <thead>
+                <tr><th>Ticker</th><th>Direction</th><th>Confidence</th><th>Expected Δ</th><th>Horizon</th><th>Regime</th></tr>
+              </thead>
+              <tbody>
+                {signals.map((s,i) => <SignalRow key={i} sig={s} />)}
+                {!signals.length && (
+                  <tr><td colSpan={6} style={{color:'var(--muted)',textAlign:'center',padding:20}}>
+                    No signals — waiting for next cycle
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── POSITIONS tab ── */}
+      {tab === 'positions' && (
+        <div style={{padding:'0 24px 16px'}}>
+          <div className="card">
+            <div className="card-title" style={{marginBottom:10}}>
+              Open Positions ({positions.length})
+            </div>
+            <table className="table">
+              <thead>
+                <tr><th>Ticker</th><th>Direction</th><th>Entry</th><th>Current</th><th>Unrealized P&L</th><th>Stop Loss</th></tr>
+              </thead>
+              <tbody>
+                {positions.map((p,i) => <PositionRow key={i} pos={p} />)}
+                {!positions.length && (
+                  <tr><td colSpan={6} style={{color:'var(--muted)',textAlign:'center',padding:20}}>
+                    No open positions
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── SWARM tab ── */}
+      {tab === 'swarm' && (
+        <div style={{padding:'0 24px 16px'}}>
+          <div className="grid" style={{gridTemplateColumns:'1fr 1fr',padding:0,marginBottom:12}}>
+            <div className="card">
+              <div className="card-title">Agent Personality Distribution</div>
+              <SwarmViz personalities={swarm.personalities} />
+            </div>
+            <div className="card">
+              <div className="card-title">Swarm Consensus</div>
+              {[
+                ['Total Agents', swarm.n_agents||1000, 'accent'],
+                ['Bullish', fmt.pct(swarm.bull_pct), 'green'],
+                ['Bearish', fmt.pct(swarm.bear_pct), 'red'],
+                ['Herding Detected', swarm.herding ? 'YES' : 'No', swarm.herding ? 'red' : 'green'],
+                ['Panic Cascade', swarm.panic ? 'ACTIVE' : 'Clear', swarm.panic ? 'red' : 'green'],
+                ['Bimodal Split', swarm.bimodal ? 'YES' : 'No', swarm.bimodal ? 'accent' : 'green'],
+                ['Consensus Score', fmt.num(swarm.consensus_score), 'blue'],
+              ].map(([label,val,col]) => (
+                <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #1a1d27'}}>
+                  <span style={{color:'var(--muted)',fontSize:11}}>{label}</span>
+                  <span className={col}>{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-title">Per-Ticker Swarm Signals (top 20)</div>
+            <table className="table">
+              <thead><tr><th>Ticker</th><th>Bull%</th><th>Bear%</th><th>Neutral%</th><th>Consensus</th><th>Herding</th></tr></thead>
+              <tbody>
+                {(swarm.ticker_signals||[]).slice(0,20).map((s,i) => (
+                  <tr key={i}>
+                    <td className="accent">{s.ticker}</td>
+                    <td className="green">{fmt.pct(s.bull)}</td>
+                    <td className="red">{fmt.pct(s.bear)}</td>
+                    <td style={{color:'var(--muted)'}}>{fmt.pct(s.neutral)}</td>
+                    <td className={Math.abs(s.consensus||0)>=0.5?'green':'accent'}>{fmt.num(s.consensus)}</td>
+                    <td>{s.herding?<span className="red">⚠ YES</span>:<span className="green">No</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── LOGS tab ── */}
+      {tab === 'logs' && (
+        <div style={{padding:'0 24px 16px'}}>
+          <div className="card">
+            <div className="card-title" style={{marginBottom:10}}>Live System Logs</div>
+            <LogPanel logs={logs} />
+          </div>
+        </div>
+      )}
+
+      <div style={{padding:'12px 24px',color:'var(--muted)',fontSize:10,textAlign:'center'}}>
+        QuantSwarm v3 — Paper mode only. Not financial advice.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
