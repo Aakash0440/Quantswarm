@@ -17,7 +17,7 @@ ingestion:
     - stocks
     - CryptoCurrency
   sec_forms: [4, 8-K]
-
+  
 instruments:
   stocks:
     - AAPL
@@ -30,7 +30,21 @@ instruments:
     - AMD
     - NFLX
     - JPM
+    - BAC
+    - GS
+    - AMGN
+    - JNJ
+    - PFE
+    - XOM
+    - CVX
+    - WMT
+    - COST
+    - DIS
   crypto:
+    - BTC-USD
+    - ETH-USD
+    - SOL-USD
+    - BNB-USD
     - XRP-USD
     - DOGE-USD
     - ADA-USD
